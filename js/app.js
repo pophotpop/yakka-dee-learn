@@ -130,6 +130,7 @@ const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 // ===================== SPEECH =====================
 let speechReady = false;
 let speechInitAttempted = false;
+let wechatWarned = false;
 
 function initSpeech() {
   if (!window.speechSynthesis) return false;
@@ -145,34 +146,64 @@ function playWord(word) {
   const w = word || currentQueue[currentIndex]?.word;
   if (!w) return;
   
-  // First time - need user interaction to unlock audio
-  if (!speechInitAttempted) {
-    initSpeech();
+  if (!speechInitAttempted) { initSpeech(); }
+  
+  // Try native speech first
+  if (window.speechSynthesis && !isWeChat) {
+    try {
+      const utter = new SpeechSynthesisUtterance(w);
+      utter.lang = 'en-GB';
+      utter.rate = state.settings.rate || 1;
+      utter.pitch = 1.1;
+      utter.volume = 1;
+      const voices = speechSynthesis.getVoices();
+      const enVoice = voices.find(v => v.lang.includes('en-GB') || v.lang.includes('en-'));
+      if (enVoice) utter.voice = enVoice;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utter);
+      return;
+    } catch(e) {}
   }
   
-  if (!window.speechSynthesis) {
-    showSpeechToast('您的浏览器不支持语音播放 😢');
-    return;
-  }
+  // Fallback: Youdao TTS (works in WeChat)
+  playYoudaoTTS(w);
+}
+
+function playYoudaoTTS(word) {
+  // Remove the old audio if exists to avoid overlap
+  let old = document.getElementById('tts-audio');
+  if (old) old.remove();
   
-  try {
-    const utter = new SpeechSynthesisUtterance(w);
-    utter.lang = 'en-GB';
-    utter.rate = state.settings.rate || 1;
-    utter.pitch = 1.1;
-    utter.volume = 1;
-    
-    // Try to select a good English voice
-    const voices = speechSynthesis.getVoices();
-    const enVoice = voices.find(v => v.lang.includes('en-GB') || v.lang.includes('en-'));
-    if (enVoice) utter.voice = enVoice;
-    
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utter);
-  } catch(e) {
-    console.error('Speech error:', e);
-    showSpeechToast('语音播放失败，请尝试刷新页面');
+  const audio = document.createElement('audio');
+  audio.id = 'tts-audio';
+  audio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`; // type=1 UK, type=2 US
+  audio.style.display = 'none';
+  document.body.appendChild(audio);
+  
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise.catch(err => {
+      console.error('Youdao TTS failed:', err);
+      // Final fallback: Google Dictionary audio
+      playGoogleTTS(word);
+    });
   }
+}
+
+function playGoogleTTS(word) {
+  let old = document.getElementById('tts-audio');
+  if (old) old.remove();
+  
+  const audio = document.createElement('audio');
+  audio.id = 'tts-audio';
+  audio.src = `https://ssl.gstatic.com/dictionary/static/sounds/20200429/${encodeURIComponent(word.toLowerCase())}--_gb_1.mp3`;
+  audio.style.display = 'none';
+  document.body.appendChild(audio);
+  
+  audio.play().catch(err => {
+    console.error('Google TTS failed:', err);
+    showSpeechToast('🔇 语音播放失败，请尝试用 Safari/Chrome 打开');
+  });
 }
 
 function showSpeechToast(msg) {
@@ -290,6 +321,12 @@ function renderHome() {
   const userDisplay = document.getElementById('user-display');
   if (userDisplay) {
     userDisplay.textContent = currentUser ? `👋 ${currentUser.displayName}` : '👋 游客';
+  }
+
+  // WeChat detection warning
+  const wechatBanner = document.getElementById('wechat-banner');
+  if (wechatBanner && isWeChat) {
+    wechatBanner.classList.remove('hidden');
   }
 }
 
@@ -745,6 +782,173 @@ function initApp() {
     if (!speechInitAttempted) {
       initSpeech();
     }
+  }, { once: true, passive: true });
+}
+
+// ===================== QR CODE SYNC =====================
+function getSyncPayload() {
+  const payload = {
+    user: currentUser ? { username: currentUser.username, displayName: currentUser.displayName } : null,
+    state: state,
+    v: APP_VERSION,
+    t: Date.now()
+  };
+  return btoa(encodeURIComponent(JSON.stringify(payload)));
+}
+
+function decodeSyncPayload(encoded) {
+  try {
+    const json = decodeURIComponent(atob(encoded));
+    return JSON.parse(json);
+  } catch(e) { return null; }
+}
+
+function showQRCodeExport() {
+  const container = document.getElementById('qr-code-container');
+  container.innerHTML = '';
+  const payload = getSyncPayload();
+  const url = `${window.location.origin}${window.location.pathname}?sync=${payload}`;
+  
+  // Limit payload size for QR code (keep it under 1000 chars for reliable scanning)
+  const truncatedPayload = payload.length > 1000 ? null : payload;
+  
+  if (truncatedPayload) {
+    const qrDiv = document.createElement('div');
+    container.appendChild(qrDiv);
+    new QRCode(qrDiv, {
+      text: url,
+      width: 200,
+      height: 200,
+      colorDark: '#6366f1',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } else {
+    container.innerHTML = '<div class="text-sm text-gray-400 text-center">数据量过大，请使用"复制同步链接"方式</div>';
+  }
+  
+  document.getElementById('qr-export-modal').classList.remove('hidden');
+  window._currentSyncUrl = url;
+}
+
+function closeQRModal() {
+  document.getElementById('qr-export-modal').classList.add('hidden');
+  window._currentSyncUrl = null;
+}
+
+function copySyncLink() {
+  if (!window._currentSyncUrl) {
+    window._currentSyncUrl = `${window.location.origin}${window.location.pathname}?sync=${getSyncPayload()}`;
+  }
+  navigator.clipboard.writeText(window._currentSyncUrl).then(() => {
+    showSpeechToast('同步链接已复制，去另一台设备粘贴即可');
+  }).catch(() => {
+    showSpeechToast('复制失败，请长按手动复制链接');
+  });
+}
+
+function showQRCodeImport() {
+  document.getElementById('qr-import-modal').classList.remove('hidden');
+  document.getElementById('qr-import-text').value = '';
+  document.getElementById('qr-import-text').focus();
+}
+
+function closeQRImportModal() {
+  document.getElementById('qr-import-modal').classList.add('hidden');
+}
+
+function handleQRImport() {
+  const text = document.getElementById('qr-import-text').value.trim();
+  if (!text) return;
+  
+  // Try to extract sync param from URL
+  let encoded = text;
+  if (text.includes('?sync=')) {
+    encoded = new URL(text).searchParams.get('sync') || text;
+  }
+  
+  const data = decodeSyncPayload(encoded);
+  if (!data || !data.state) {
+    showSpeechToast('无效的同步数据，请检查链接');
+    return;
+  }
+  
+  // Restore data
+  if (data.user && data.user.username) {
+    localStorage.setItem(`yakka_data_${data.user.username}`, JSON.stringify(data.state));
+    if (data.state.settings) {
+      localStorage.setItem(`yakka_settings_${data.user.username}`, JSON.stringify(data.state.settings));
+    }
+    showSpeechToast(`数据已恢复到用户：${data.user.displayName || data.user.username}`);
+  } else {
+    state = { ...state, ...data.state };
+    saveState();
+    initDay();
+    renderHome();
+    showSpeechToast('数据导入成功！');
+  }
+  closeQRImportModal();
+}
+
+// Check for sync param on load
+function checkSyncParam() {
+  const params = new URLSearchParams(window.location.search);
+  const sync = params.get('sync');
+  if (sync) {
+    const data = decodeSyncPayload(sync);
+    if (data && data.state) {
+      if (confirm('检测到同步数据，是否导入？')) {
+        if (data.user && data.user.username) {
+          localStorage.setItem(`yakka_data_${data.user.username}`, JSON.stringify(data.state));
+          if (data.state.settings) {
+            localStorage.setItem(`yakka_settings_${data.user.username}`, JSON.stringify(data.state.settings));
+          }
+        } else {
+          state = { ...state, ...data.state };
+          saveState();
+        }
+        showSpeechToast('同步数据已导入！');
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ===================== INIT =====================
+function initApp() {
+  // Check sync param first
+  if (checkSyncParam()) {
+    loadCurrentUser();
+    initDarkMode();
+    if (currentUser) { loadState(); }
+    showScreen('home-screen');
+    initDay();
+    renderHome();
+    return;
+  }
+  
+  loadCurrentUser();
+  initDarkMode();
+  
+  if (currentUser) {
+    loadState();
+    initDay();
+    showScreen('home-screen');
+    renderHome();
+  } else {
+    showAuthScreen();
+  }
+  
+  // Pre-init speech on first interaction
+  document.body.addEventListener('click', () => {
+    if (!speechInitAttempted) { initSpeech(); }
+  }, { once: true });
+  
+  document.body.addEventListener('touchstart', () => {
+    if (!speechInitAttempted) { initSpeech(); }
   }, { once: true, passive: true });
 }
 
