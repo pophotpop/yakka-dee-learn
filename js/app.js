@@ -132,6 +132,24 @@ let speechReady = false;
 let speechInitAttempted = false;
 let wechatWarned = false;
 
+// Preload audio pool for WeChat
+const audioPool = [];
+let audioPoolIdx = 0;
+function initAudioPool() {
+  for (let i = 0; i < 3; i++) {
+    const a = new Audio();
+    a.preload = 'none';
+    audioPool.push(a);
+  }
+}
+initAudioPool();
+
+function getAudio() {
+  const a = audioPool[audioPoolIdx % audioPool.length];
+  audioPoolIdx++;
+  return a;
+}
+
 function initSpeech() {
   if (!window.speechSynthesis) return false;
   try {
@@ -148,7 +166,7 @@ function playWord(word) {
   
   if (!speechInitAttempted) { initSpeech(); }
   
-  // Try native speech first
+  // Priority 1: Native Web Speech (best quality, Safari/Chrome)
   if (window.speechSynthesis && !isWeChat) {
     try {
       const utter = new SpeechSynthesisUtterance(w);
@@ -165,45 +183,47 @@ function playWord(word) {
     } catch(e) {}
   }
   
-  // Fallback: Youdao TTS (works in WeChat)
-  playYoudaoTTS(w);
+  // Priority 2: Online TTS for WeChat/others
+  playOnlineTTS(w);
 }
 
-function playYoudaoTTS(word) {
-  // Remove the old audio if exists to avoid overlap
-  let old = document.getElementById('tts-audio');
-  if (old) old.remove();
+function playOnlineTTS(word) {
+  const audio = getAudio();
+  audio.pause();
   
-  const audio = document.createElement('audio');
-  audio.id = 'tts-audio';
-  audio.src = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`; // type=1 UK, type=2 US
-  audio.style.display = 'none';
-  document.body.appendChild(audio);
+  // Try multiple sources
+  const sources = [
+    // Youdao UK
+    `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=1`,
+    // Youdao US
+    `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(word)}&type=2`,
+    // Baidu
+    `https://fanyi.baidu.com/gettts?lan=uk&text=${encodeURIComponent(word)}&spd=3&source=web`,
+    // iCIBA
+    `https://dict-co.iciba.com/search?word=${encodeURIComponent(word)}&type=1`
+  ];
   
-  const playPromise = audio.play();
-  if (playPromise !== undefined) {
-    playPromise.catch(err => {
-      console.error('Youdao TTS failed:', err);
-      // Final fallback: Google Dictionary audio
-      playGoogleTTS(word);
-    });
+  let srcIdx = 0;
+  
+  function tryNext() {
+    if (srcIdx >= sources.length) {
+      showSpeechToast('🔇 语音加载失败，请尝试用 Safari 打开');
+      return;
+    }
+    audio.src = sources[srcIdx++];
+    audio.currentTime = 0;
+    
+    // Must play immediately (synchronous from click handler)
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.log('TTS source failed:', audio.src, err);
+        tryNext();
+      });
+    }
   }
-}
-
-function playGoogleTTS(word) {
-  let old = document.getElementById('tts-audio');
-  if (old) old.remove();
   
-  const audio = document.createElement('audio');
-  audio.id = 'tts-audio';
-  audio.src = `https://ssl.gstatic.com/dictionary/static/sounds/20200429/${encodeURIComponent(word.toLowerCase())}--_gb_1.mp3`;
-  audio.style.display = 'none';
-  document.body.appendChild(audio);
-  
-  audio.play().catch(err => {
-    console.error('Google TTS failed:', err);
-    showSpeechToast('🔇 语音播放失败，请尝试用 Safari/Chrome 打开');
-  });
+  tryNext();
 }
 
 function showSpeechToast(msg) {
@@ -384,12 +404,9 @@ function renderCard() {
   card.classList.add('fade-in');
   setTimeout(() => card.classList.remove('fade-in'), 400);
   
-  // Auto-play after card shows, but with better handling
-  setTimeout(() => {
-    if (speechInitAttempted) {
-      playWord(w.word);
-    }
-  }, 500);
+  // NOTE: Auto-play removed for WeChat compatibility.
+  // WeChat requires audio.play() to be triggered by a direct user gesture.
+  // User must tap the card or the 🔊 button to hear the word.
 }
 
 function markWord(known) {
