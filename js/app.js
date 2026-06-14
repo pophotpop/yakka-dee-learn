@@ -1,6 +1,91 @@
-// Yakka Dee Learning App - Main Logic
-// PWA + Dark Mode + Achievements + Import/Export
+// Yakka Dee Learning App - Full Version
+// Features: User Auth, Speech Fix, Dark Mode, PWA, Achievements, Import/Export
 
+const APP_VERSION = '2.0';
+
+// ===================== USER SYSTEM =====================
+let currentUser = null; // { username, displayName, createdAt }
+
+function getUserKey() {
+  return currentUser ? `yakka_data_${currentUser.username}` : 'yakka_data_guest';
+}
+function getUserSettingsKey() {
+  return currentUser ? `yakka_settings_${currentUser.username}` : 'yakka_settings_guest';
+}
+
+function getAllUsers() {
+  const users = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('yakka_user_')) {
+      try { users.push(JSON.parse(localStorage.getItem(key))); } catch(e) {}
+    }
+  }
+  return users.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function saveUser(user) {
+  localStorage.setItem(`yakka_user_${user.username}`, JSON.stringify(user));
+}
+
+function loadCurrentUser() {
+  const raw = localStorage.getItem('yakka_current_user');
+  if (raw) {
+    try { currentUser = JSON.parse(raw); } catch(e) {}
+  }
+}
+
+function setCurrentUser(user) {
+  currentUser = user;
+  if (user) {
+    localStorage.setItem('yakka_current_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('yakka_current_user');
+  }
+}
+
+function registerUser(username, password, displayName) {
+  username = username.trim().toLowerCase();
+  if (!username || !password) return { ok: false, msg: '用户名和密码不能为空' };
+  if (username.length < 2 || username.length > 20) return { ok: false, msg: '用户名长度2-20位' };
+  if (password.length < 4) return { ok: false, msg: '密码至少4位' };
+  
+  const existing = localStorage.getItem(`yakka_user_${username}`);
+  if (existing) return { ok: false, msg: '用户名已存在' };
+  
+  const user = { username, password, displayName: displayName || username, createdAt: Date.now() };
+  saveUser(user);
+  setCurrentUser(user);
+  // Init empty data for new user
+  saveState();
+  return { ok: true, msg: '注册成功' };
+}
+
+function loginUser(username, password) {
+  username = username.trim().toLowerCase();
+  const raw = localStorage.getItem(`yakka_user_${username}`);
+  if (!raw) return { ok: false, msg: '用户名不存在' };
+  const user = JSON.parse(raw);
+  if (user.password !== password) return { ok: false, msg: '密码错误' };
+  setCurrentUser(user);
+  return { ok: true, msg: '登录成功' };
+}
+
+function logoutUser() {
+  setCurrentUser(null);
+  showAuthScreen();
+}
+
+function deleteUser(username) {
+  localStorage.removeItem(`yakka_user_${username}`);
+  localStorage.removeItem(`yakka_data_${username}`);
+  localStorage.removeItem(`yakka_settings_${username}`);
+  if (currentUser && currentUser.username === username) {
+    setCurrentUser(null);
+  }
+}
+
+// ===================== STATE =====================
 let state = {
   learned: {},
   lastDate: null,
@@ -22,19 +107,83 @@ let todayLearned = { new: 0, review: 0 };
 
 // ===================== STORAGE =====================
 function loadState() {
-  const raw = localStorage.getItem('yakka_state');
+  const raw = localStorage.getItem(getUserKey());
   if (raw) {
     try { state = { ...state, ...JSON.parse(raw) }; } catch (e) {}
   }
-  const rawSettings = localStorage.getItem('yakka_settings');
+  const rawSettings = localStorage.getItem(getUserSettingsKey());
   if (rawSettings) {
     try { state.settings = { ...state.settings, ...JSON.parse(rawSettings) }; } catch (e) {}
   }
 }
 
 function saveState() {
-  localStorage.setItem('yakka_state', JSON.stringify(state));
-  localStorage.setItem('yakka_settings', JSON.stringify(state.settings));
+  localStorage.setItem(getUserKey(), JSON.stringify(state));
+  localStorage.setItem(getUserSettingsKey(), JSON.stringify(state.settings));
+}
+
+// ===================== BROWSER DETECTION =====================
+const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+// ===================== SPEECH =====================
+let speechReady = false;
+let speechInitAttempted = false;
+
+function initSpeech() {
+  if (!window.speechSynthesis) return false;
+  try {
+    speechSynthesis.getVoices();
+    speechReady = true;
+    speechInitAttempted = true;
+    return true;
+  } catch(e) { return false; }
+}
+
+function playWord(word) {
+  const w = word || currentQueue[currentIndex]?.word;
+  if (!w) return;
+  
+  // First time - need user interaction to unlock audio
+  if (!speechInitAttempted) {
+    initSpeech();
+  }
+  
+  if (!window.speechSynthesis) {
+    showSpeechToast('您的浏览器不支持语音播放 😢');
+    return;
+  }
+  
+  try {
+    const utter = new SpeechSynthesisUtterance(w);
+    utter.lang = 'en-GB';
+    utter.rate = state.settings.rate || 1;
+    utter.pitch = 1.1;
+    utter.volume = 1;
+    
+    // Try to select a good English voice
+    const voices = speechSynthesis.getVoices();
+    const enVoice = voices.find(v => v.lang.includes('en-GB') || v.lang.includes('en-'));
+    if (enVoice) utter.voice = enVoice;
+    
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  } catch(e) {
+    console.error('Speech error:', e);
+    showSpeechToast('语音播放失败，请尝试刷新页面');
+  }
+}
+
+function showSpeechToast(msg) {
+  const existing = document.getElementById('speech-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'speech-toast';
+  toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-full text-sm shadow-lg z-50 fade-in';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
 }
 
 // ===================== DARK MODE =====================
@@ -42,50 +191,28 @@ function initDarkMode() {
   const mode = state.settings.darkMode || 'auto';
   if (mode === 'dark') {
     document.documentElement.classList.add('dark');
-    document.getElementById('dark-icon').textContent = '☀️';
-    document.getElementById('dark-mode-btn').textContent = '深色';
   } else if (mode === 'light') {
     document.documentElement.classList.remove('dark');
-    document.getElementById('dark-icon').textContent = '🌙';
-    document.getElementById('dark-mode-btn').textContent = '浅色';
   } else {
-    // auto - follow system
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark) {
-      document.documentElement.classList.add('dark');
-      document.getElementById('dark-icon').textContent = '☀️';
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.getElementById('dark-icon').textContent = '🌙';
-    }
-    document.getElementById('dark-mode-btn').textContent = '跟随系统';
+    document.documentElement.classList.toggle('dark', prefersDark);
   }
 }
 
 function toggleDarkMode() {
   const modes = ['auto', 'light', 'dark'];
   const current = state.settings.darkMode || 'auto';
-  const next = modes[(modes.indexOf(current) + 1) % modes.length];
-  state.settings.darkMode = next;
+  state.settings.darkMode = modes[(modes.indexOf(current) + 1) % modes.length];
   saveState();
   initDarkMode();
+  showScreen('home-screen');
+  initDay();
+  renderHome();
 }
 
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
   if (state.settings.darkMode === 'auto') initDarkMode();
 });
-
-// ===================== SPEECH =====================
-function playWord(word) {
-  const w = word || currentQueue[currentIndex]?.word;
-  if (!w) return;
-  const utter = new SpeechSynthesisUtterance(w);
-  utter.lang = 'en-GB';
-  utter.rate = state.settings.rate || 1;
-  utter.pitch = 1.1;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utter);
-}
 
 // ===================== PLANNING =====================
 function getTodayStr() {
@@ -118,12 +245,10 @@ function initDay() {
   const dr = parseInt(state.settings.dailyReview) || 5;
 
   todayNew = unlearned.slice(0, dn);
-
   const reviewPool = learnedWords.map(w => ({
     word: w, ...state.learned[w],
     obj: UNIQUE_WORDS.find(x => x.word === w)
   })).filter(x => x.obj).sort((a, b) => (a.reviewAt || 0) - (b.reviewAt || 0));
-
   todayReview = reviewPool.slice(0, dr).map(x => x.obj);
 }
 
@@ -160,6 +285,12 @@ function renderHome() {
   updateAchievements();
   const earned = Object.values(state.achievements).filter(Boolean).length;
   document.getElementById('achievement-count').textContent = `已获得 ${earned}/${ACHIEVEMENTS.length} 个徽章`;
+  
+  // Update user display
+  const userDisplay = document.getElementById('user-display');
+  if (userDisplay) {
+    userDisplay.textContent = currentUser ? `👋 ${currentUser.displayName}` : '👋 游客';
+  }
 }
 
 function renderPreview(id, words, btnId) {
@@ -215,7 +346,13 @@ function renderCard() {
   card.classList.remove('swipe-left', 'swipe-right');
   card.classList.add('fade-in');
   setTimeout(() => card.classList.remove('fade-in'), 400);
-  setTimeout(() => playWord(w.word), 400);
+  
+  // Auto-play after card shows, but with better handling
+  setTimeout(() => {
+    if (speechInitAttempted) {
+      playWord(w.word);
+    }
+  }, 500);
 }
 
 function markWord(known) {
@@ -256,7 +393,6 @@ function finishQueue() {
   if (currentMode === 'new' && todayReview.length > 0) {
     if (confirm('新词学习完成！是否开始复习？')) { startLearning('review'); return; }
   }
-  // Check perfect day
   const done = todayLearned.new + todayLearned.review;
   const total = todayNew.length + todayReview.length;
   if (total > 0 && done >= total) {
@@ -359,17 +495,22 @@ function updateAchievements() {
 
 // ===================== DATA EXPORT/IMPORT =====================
 function exportData() {
-  const data = { ...state, exportDate: new Date().toISOString(), version: '1.0' };
+  const data = { 
+    user: currentUser, 
+    state: state, 
+    exportDate: new Date().toISOString(), 
+    version: APP_VERSION 
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `yakka-dee-backup-${getTodayStr()}.json`;
+  a.download = `yakka-dee-backup-${currentUser ? currentUser.username : 'guest'}-${getTodayStr()}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  alert('备份已下载！');
+  showSpeechToast('备份已下载！');
 }
 
 function importData() {
@@ -383,17 +524,27 @@ function handleImport(event) {
   reader.onload = (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.learned && data.settings) {
-        state = { ...state, ...data };
-        saveState();
-        initDay();
-        renderHome();
-        alert('进度恢复成功！');
+      if (data.state && data.state.learned) {
+        if (data.user && data.user.username) {
+          // Restore to specific user
+          localStorage.setItem(`yakka_data_${data.user.username}`, JSON.stringify(data.state));
+          if (data.state.settings) {
+            localStorage.setItem(`yakka_settings_${data.user.username}`, JSON.stringify(data.state.settings));
+          }
+          showSpeechToast(`数据已恢复到用户：${data.user.displayName || data.user.username}`);
+        } else {
+          // Restore to current user
+          state = { ...state, ...data.state };
+          saveState();
+          initDay();
+          renderHome();
+          showSpeechToast('进度恢复成功！');
+        }
       } else {
-        alert('无效的备份文件！');
+        showSpeechToast('无效的备份文件！');
       }
     } catch (err) {
-      alert('文件解析失败！');
+      showSpeechToast('文件解析失败！');
     }
     event.target.value = '';
   };
@@ -402,15 +553,119 @@ function handleImport(event) {
 
 // ===================== NAVIGATION =====================
 function showScreen(id) {
-  ['home-screen', 'learn-screen', 'complete-screen', 'wordlist-screen', 'achievements-screen'].forEach(sid => {
-    document.getElementById(sid).classList.add('hidden');
+  ['auth-screen', 'home-screen', 'learn-screen', 'complete-screen', 'wordlist-screen', 'achievements-screen'].forEach(sid => {
+    const el = document.getElementById(sid);
+    if (el) el.classList.add('hidden');
   });
-  document.getElementById(id).classList.remove('hidden');
-  document.getElementById(id).classList.add('fade-in');
-  setTimeout(() => document.getElementById(id).classList.remove('fade-in'), 400);
+  const target = document.getElementById(id);
+  if (target) {
+    target.classList.remove('hidden');
+    target.classList.add('fade-in');
+    setTimeout(() => target.classList.remove('fade-in'), 400);
+  }
 }
 
 function goHome() { showScreen('home-screen'); initDay(); renderHome(); }
+
+// ===================== AUTH SCREEN =====================
+function showAuthScreen() {
+  showScreen('auth-screen');
+  renderAuthScreen();
+}
+
+function renderAuthScreen() {
+  const users = getAllUsers();
+  const existingUsers = document.getElementById('existing-users');
+  existingUsers.innerHTML = '';
+  
+  if (users.length > 0) {
+    users.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'flex items-center justify-between bg-white rounded-xl p-3 shadow-sm dark:bg-gray-800';
+      div.innerHTML = `
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm">👤</div>
+          <div>
+            <div class="text-sm font-bold text-gray-800 dark:text-white">${u.displayName || u.username}</div>
+            <div class="text-xs text-gray-400">${u.username}</div>
+          </div>
+        </div>
+        <button onclick="switchToUser('${u.username}')" class="text-xs bg-indigo-500 text-white px-3 py-1 rounded-full font-bold">进入</button>
+      `;
+      existingUsers.appendChild(div);
+    });
+  } else {
+    existingUsers.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">暂无用户，请先注册</div>';
+  }
+}
+
+function switchToUser(username) {
+  const raw = localStorage.getItem(`yakka_user_${username}`);
+  if (!raw) return;
+  const user = JSON.parse(raw);
+  setCurrentUser(user);
+  loadState();
+  initDay();
+  showScreen('home-screen');
+  renderHome();
+  showSpeechToast(`欢迎回来，${user.displayName || user.username}！`);
+}
+
+function handleRegister() {
+  const username = document.getElementById('reg-username').value;
+  const password = document.getElementById('reg-password').value;
+  const displayName = document.getElementById('reg-display').value;
+  const result = registerUser(username, password, displayName);
+  if (result.ok) {
+    loadState();
+    initDay();
+    showScreen('home-screen');
+    renderHome();
+    showSpeechToast(result.msg);
+  } else {
+    document.getElementById('reg-error').textContent = result.msg;
+  }
+}
+
+function handleLogin() {
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+  const result = loginUser(username, password);
+  if (result.ok) {
+    loadState();
+    initDay();
+    showScreen('home-screen');
+    renderHome();
+    showSpeechToast(result.msg);
+  } else {
+    document.getElementById('login-error').textContent = result.msg;
+  }
+}
+
+function showGuest() {
+  setCurrentUser(null);
+  loadState();
+  initDay();
+  showScreen('home-screen');
+  renderHome();
+  showSpeechToast('以游客身份进入');
+}
+
+function showLoginForm() {
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('register-form').classList.add('hidden');
+  document.getElementById('auth-tabs').querySelectorAll('button').forEach((b, i) => {
+    b.className = i === 0 ? 'flex-1 py-2 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600' : 'flex-1 py-2 text-sm text-gray-400';
+  });
+}
+
+function showRegisterForm() {
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('register-form').classList.remove('hidden');
+  document.getElementById('auth-tabs').querySelectorAll('button').forEach((b, i) => {
+    b.className = i === 1 ? 'flex-1 py-2 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600' : 'flex-1 py-2 text-sm text-gray-400';
+  });
+}
 
 // ===================== SETTINGS =====================
 function showSettings() {
@@ -418,6 +673,8 @@ function showSettings() {
   document.getElementById('speech-rate').value = state.settings.rate || 1;
   document.getElementById('daily-new').value = state.settings.dailyNew || 5;
   document.getElementById('daily-review').value = state.settings.dailyReview || 5;
+  document.getElementById('dark-mode-btn').textContent = 
+    state.settings.darkMode === 'dark' ? '深色' : state.settings.darkMode === 'light' ? '浅色' : '跟随系统';
 }
 
 function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
@@ -438,7 +695,7 @@ function resetProgress() {
   closeSettings();
   initDay();
   renderHome();
-  alert('进度已重置');
+  showSpeechToast('进度已重置');
 }
 
 // ===================== TOUCH SWIPE =====================
@@ -463,11 +720,37 @@ if ('serviceWorker' in navigator) {
 }
 
 // ===================== INIT =====================
-loadState();
-initDarkMode();
-initDay();
-renderHome();
+function initApp() {
+  loadCurrentUser();
+  initDarkMode();
+  
+  if (currentUser) {
+    loadState();
+    initDay();
+    showScreen('home-screen');
+    renderHome();
+  } else {
+    showAuthScreen();
+  }
+  
+  // Pre-init speech on first interaction
+  document.body.addEventListener('click', () => {
+    if (!speechInitAttempted) {
+      initSpeech();
+    }
+  }, { once: true });
+  
+  // Also init on touch
+  document.body.addEventListener('touchstart', () => {
+    if (!speechInitAttempted) {
+      initSpeech();
+    }
+  }, { once: true, passive: true });
+}
 
-if (speechSynthesis) {
-  speechSynthesis.getVoices();
+// Wait for DOM
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
 }

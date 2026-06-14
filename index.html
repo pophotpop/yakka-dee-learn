@@ -1,57 +1,119 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#6366f1">
-  <meta name="description" content="Yakka Dee 单词学习卡片 - 基于CBeebies热门动画的英语启蒙单词卡，适合2-6岁儿童">
-  
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="images/icon-192.png">
-  
-  <!-- Open Graph -->
-  <meta property="og:title" content="Yakka Dee 单词学习">
-  <meta property="og:description" content="快乐学单词，像看动画一样学英语">
-  <meta property="og:type" content="website">
-  <meta property="og:image" content="./images/og-image.png">
-  
-  <title>Yakka Dee 单词学习</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#6366f1">
+<meta name="description" content="Yakka Dee 单词学习卡片 - 基于CBeebies热门动画的英语启蒙单词卡，适合2-6岁儿童">
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="images/icon-192.png">
+
+<meta property="og:title" content="Yakka Dee 单词学习">
+<meta property="og:description" content="快乐学单词，像看动画一样学英语">
+<meta property="og:type" content="website">
+<meta property="og:image" content="./images/og-image.png">
+
+<title>Yakka Dee 单词学习</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen text-gray-800 select-none dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
 
 <div id="app" class="max-w-md mx-auto min-h-screen relative overflow-hidden">
 
-  <!-- Header -->
-  <header class="px-5 pt-6 pb-2 flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-black text-indigo-600 tracking-tight">Yakka Dee</h1>
-      <p class="text-xs text-gray-500 mt-0.5" id="subtitle">快乐学单词</p>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="text-right">
-        <div class="text-xs text-gray-400">连续学习</div>
-        <div class="text-lg font-bold text-orange-500" id="streak">🔥 0</div>
+  <!-- ========== AUTH SCREEN ========== -->
+  <div id="auth-screen" class="hidden">
+    <div class="px-6 pt-12 pb-6">
+      <div class="text-center mb-8">
+        <div class="text-6xl mb-4">📚</div>
+        <h1 class="text-3xl font-black text-indigo-600 tracking-tight">Yakka Dee</h1>
+        <p class="text-sm text-gray-500 mt-1">快乐学单词，像看动画一样学英语</p>
       </div>
-      <button onclick="toggleDarkMode()" class="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer btn-press dark:bg-gray-700">
-        <span id="dark-icon">🌙</span>
-      </button>
-      <button onclick="showSettings()" class="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer btn-press dark:bg-gray-700">
-        ⚙️
-      </button>
+
+      <!-- Existing Users -->
+      <div id="existing-users-section" class="mb-6">
+        <h3 class="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">已有用户</h3>
+        <div id="existing-users" class="space-y-2">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Auth Tabs -->
+      <div id="auth-tabs" class="flex border-b border-gray-200 mb-4 dark:border-gray-700">
+        <button onclick="showLoginForm()" class="flex-1 py-2 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600">登录</button>
+        <button onclick="showRegisterForm()" class="flex-1 py-2 text-sm text-gray-400">注册</button>
+      </div>
+
+      <!-- Login Form -->
+      <div id="login-form" class="space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">用户名</label>
+          <input type="text" id="login-username" placeholder="输入用户名" class="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">密码</label>
+          <input type="password" id="login-password" placeholder="输入密码" class="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div id="login-error" class="text-xs text-red-500 text-center"></div>
+        <button onclick="handleLogin()" class="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-3 rounded-xl shadow-lg btn-press">
+          登录
+        </button>
+      </div>
+
+      <!-- Register Form -->
+      <div id="register-form" class="hidden space-y-4">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">用户名</label>
+          <input type="text" id="reg-username" placeholder="2-20位字母/数字" class="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">昵称</label>
+          <input type="text" id="reg-display" placeholder="显示名称（可选）" class="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">密码</label>
+          <input type="password" id="reg-password" placeholder="至少4位" class="w-full bg-gray-100 rounded-xl px-4 py-3 text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div id="reg-error" class="text-xs text-red-500 text-center"></div>
+        <button onclick="handleRegister()" class="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg btn-press">
+          注册新账号
+        </button>
+      </div>
+
+      <!-- Guest -->
+      <div class="mt-6 text-center">
+        <button onclick="showGuest()" class="text-sm text-gray-400 underline">暂不登录，以游客身份进入</button>
+      </div>
     </div>
-  </header>
+  </div>
 
-  <!-- Main Content Area -->
-  <main id="main" class="px-4 pb-24">
+  <!-- ========== HOME SCREEN ========== -->
+  <div id="home-screen" class="hidden">
+    <!-- Header -->
+    <header class="px-5 pt-6 pb-2 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-black text-indigo-600 tracking-tight">Yakka Dee</h1>
+        <p class="text-xs text-gray-500 mt-0.5" id="user-display">👋 游客</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="text-right">
+          <div class="text-xs text-gray-400">连续学习</div>
+          <div class="text-lg font-bold text-orange-500" id="streak">🔥 0</div>
+        </div>
+        <button onclick="toggleDarkMode()" class="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer btn-press dark:bg-gray-700">
+          <span id="dark-icon">🌙</span>
+        </button>
+        <button onclick="showSettings()" class="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center cursor-pointer btn-press dark:bg-gray-700">
+          ⚙️
+        </button>
+      </div>
+    </header>
 
-    <!-- Home Screen -->
-    <div id="home-screen" class="fade-in">
+    <main id="main" class="px-4 pb-24">
       <!-- Date & Progress -->
       <div class="mt-4 mb-6 bg-white rounded-2xl p-4 shadow-sm dark:bg-gray-800">
         <div class="flex justify-between items-center mb-3">
@@ -77,9 +139,7 @@
             <span class="text-xs font-bold bg-green-100 text-green-600 px-2 py-0.5 rounded-full">新词</span>
             <span class="text-xs text-gray-400" id="new-count">5个新单词</span>
           </div>
-          <div id="new-words-preview" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-            <!-- filled by JS -->
-          </div>
+          <div id="new-words-preview" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1"></div>
           <button id="btn-start-new" onclick="startLearning('new')" class="w-full mt-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-200 btn-press text-sm">
             开始学习新词 🌟
           </button>
@@ -91,9 +151,7 @@
             <span class="text-xs font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">复习</span>
             <span class="text-xs text-gray-400" id="review-count">5个待复习</span>
           </div>
-          <div id="review-words-preview" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-            <!-- filled by JS -->
-          </div>
+          <div id="review-words-preview" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1"></div>
           <button id="btn-start-review" onclick="startLearning('review')" class="w-full mt-3 bg-gradient-to-r from-orange-400 to-amber-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-orange-200 btn-press text-sm">
             开始复习 🔄
           </button>
@@ -131,7 +189,7 @@
         <div class="text-gray-300">›</div>
       </button>
 
-      <!-- Word List Shortcut -->
+      <!-- Word List -->
       <button onclick="showWordList()" class="w-full bg-white rounded-2xl p-4 shadow-sm text-left flex items-center justify-between btn-press mb-3 dark:bg-gray-800">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-lg">🔍</div>
@@ -144,7 +202,7 @@
       </button>
 
       <!-- Data Management -->
-      <div class="grid grid-cols-2 gap-3 mb-6">
+      <div class="grid grid-cols-2 gap-3 mb-3">
         <button onclick="exportData()" class="bg-white rounded-2xl p-3 text-center shadow-sm btn-press dark:bg-gray-800">
           <div class="text-lg mb-1">💾</div>
           <div class="text-xs font-bold text-gray-700 dark:text-gray-300">备份进度</div>
@@ -154,104 +212,108 @@
           <div class="text-xs font-bold text-gray-700 dark:text-gray-300">恢复进度</div>
         </button>
       </div>
+
+      <!-- Switch User / Logout -->
+      <button onclick="logoutUser()" class="w-full bg-white rounded-2xl p-3 text-center shadow-sm btn-press mb-6 dark:bg-gray-800">
+        <div class="text-xs font-bold text-gray-400">🔄 切换用户 / 退出登录</div>
+      </button>
+    </main>
+  </div>
+
+  <!-- ========== LEARNING SCREEN ========== -->
+  <div id="learn-screen" class="hidden">
+    <div class="flex items-center gap-3 mb-4 px-5 pt-6">
+      <button onclick="goHome()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center btn-press dark:bg-gray-800">←</button>
+      <div class="flex-1">
+        <div class="text-xs text-gray-400 mb-1" id="learn-mode-text">新词学习</div>
+        <div class="w-full bg-gray-100 rounded-full h-2 dark:bg-gray-700">
+          <div id="learn-progress" class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="text-xs font-bold text-indigo-600" id="learn-counter">1/5</div>
     </div>
 
-    <!-- Learning Screen -->
-    <div id="learn-screen" class="hidden">
-      <div class="flex items-center gap-3 mb-4">
-        <button onclick="goHome()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center btn-press dark:bg-gray-800">←</button>
-        <div class="flex-1">
-          <div class="text-xs text-gray-400 mb-1" id="learn-mode-text">新词学习</div>
-          <div class="w-full bg-gray-100 rounded-full h-2 dark:bg-gray-700">
-            <div id="learn-progress" class="h-full bg-indigo-500 rounded-full transition-all duration-300" style="width: 0%"></div>
-          </div>
+    <!-- Card -->
+    <div class="relative h-80 px-4" id="card-container">
+      <div id="current-card" class="card bg-white rounded-3xl shadow-xl p-6 h-full flex flex-col items-center justify-between border-4 border-transparent dark:bg-gray-800">
+        <div class="w-full flex justify-between items-start">
+          <span id="card-tag" class="text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-600">新词</span>
+          <button onclick="playWord()" class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 btn-press pulse-ring dark:bg-gray-700" id="speak-btn">
+            🔊
+          </button>
         </div>
-        <div class="text-xs font-bold text-indigo-600" id="learn-counter">1/5</div>
-      </div>
 
-      <!-- Card -->
-      <div class="relative h-96" id="card-container">
-        <div id="current-card" class="card bg-white rounded-3xl shadow-xl p-6 h-full flex flex-col items-center justify-between border-4 border-transparent dark:bg-gray-800">
-          <!-- Tag -->
-          <div class="w-full flex justify-between items-start">
-            <span id="card-tag" class="text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-600">新词</span>
-            <button onclick="playWord()" class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 btn-press pulse-ring dark:bg-gray-700">
-              🔊
-            </button>
-          </div>
-
-          <!-- Content -->
-          <div class="flex-1 flex flex-col items-center justify-center w-full">
-            <div id="card-emoji" class="text-8xl mb-4 emoji-bounce cursor-pointer" onclick="playWord()">🍌</div>
-            <div id="card-word" class="text-4xl font-black text-gray-800 mb-2 tracking-wide cursor-pointer dark:text-white" onclick="playWord()">Banana</div>
-            <div id="card-phonetic" class="text-lg text-gray-400 mb-1 font-mono">/bəˈnænə/</div>
-            <div id="card-chinese" class="text-xl font-bold text-indigo-600">香蕉</div>
-            <div id="card-example" class="text-sm text-gray-500 mt-2 italic text-center dark:text-gray-400">"A yellow banana!"</div>
-          </div>
-
-          <!-- Bottom hint -->
-          <div class="text-xs text-gray-400 text-center">点击卡片或喇叭听发音 · 左右滑动</div>
+        <div class="flex-1 flex flex-col items-center justify-center w-full">
+          <div id="card-emoji" class="text-8xl mb-2 emoji-bounce cursor-pointer" onclick="playWord()">🍌</div>
+          <div id="card-word" class="text-4xl font-black text-gray-800 mb-1 tracking-wide cursor-pointer dark:text-white" onclick="playWord()">Banana</div>
+          <div id="card-phonetic" class="text-lg text-gray-400 mb-1 font-mono">/bəˈnænə/</div>
+          <div id="card-chinese" class="text-xl font-bold text-indigo-600">香蕉</div>
+          <div id="card-example" class="text-sm text-gray-500 mt-2 italic text-center dark:text-gray-400">"Banana! Yellow banana!"</div>
         </div>
-      </div>
 
-      <!-- Controls -->
-      <div class="mt-6 grid grid-cols-2 gap-3">
-        <button onclick="markWord(false)" class="bg-white border-2 border-gray-200 text-gray-600 font-bold py-4 rounded-2xl btn-press flex flex-col items-center gap-1 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
-          <span class="text-xl">🤔</span>
-          <span class="text-sm">还要练习</span>
-        </button>
-        <button onclick="markWord(true)" class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-200 btn-press flex flex-col items-center gap-1">
-          <span class="text-xl">🌟</span>
-          <span class="text-sm">掌握了！</span>
-        </button>
-      </div>
-
-      <div class="mt-3 flex justify-between px-2">
-        <button onclick="prevCard()" class="text-sm text-gray-400 btn-press flex items-center gap-1">
-          <span>←</span> 上一个
-        </button>
-        <button onclick="skipCard()" class="text-sm text-gray-400 btn-press flex items-center gap-1">
-          跳过 <span>→</span>
-        </button>
+        <div class="text-xs text-gray-400 text-center">点击卡片或 🔊 按钮听发音</div>
       </div>
     </div>
 
-    <!-- Complete Screen -->
-    <div id="complete-screen" class="hidden text-center pt-10">
-      <div class="text-6xl mb-4">🎉</div>
-      <h2 class="text-2xl font-black text-gray-800 mb-2 dark:text-white">太棒了！</h2>
-      <p class="text-gray-500 mb-6">今日学习任务已完成</p>
-
-      <div class="bg-white rounded-2xl p-6 shadow-sm mx-4 mb-6 dark:bg-gray-800">
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div class="text-center">
-            <div class="text-3xl font-bold text-green-600" id="complete-new">0</div>
-            <div class="text-xs text-gray-400">新词掌握</div>
-          </div>
-          <div class="text-center">
-            <div class="text-3xl font-bold text-orange-600" id="complete-review">0</div>
-            <div class="text-xs text-gray-400">复习巩固</div>
-          </div>
-        </div>
-        <div class="text-center pt-4 border-t border-gray-100 dark:border-gray-700">
-          <div class="text-4xl font-black text-indigo-600 mb-1" id="complete-total">0</div>
-          <div class="text-xs text-gray-400">累计已掌握单词</div>
-        </div>
-      </div>
-
-      <div id="stars-container" class="flex justify-center gap-2 mb-8"></div>
-
-      <button onclick="goHome()" class="w-3/4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 rounded-2xl shadow-lg btn-press">
-        返回首页 🏠
+    <!-- Controls -->
+    <div class="px-4 mt-6 grid grid-cols-2 gap-3">
+      <button onclick="markWord(false)" class="bg-white border-2 border-gray-200 text-gray-600 font-bold py-4 rounded-2xl btn-press flex flex-col items-center gap-1 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300">
+        <span class="text-xl">🤔</span>
+        <span class="text-sm">还要练习</span>
+      </button>
+      <button onclick="markWord(true)" class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-indigo-200 btn-press flex flex-col items-center gap-1">
+        <span class="text-xl">🌟</span>
+        <span class="text-sm">掌握了！</span>
       </button>
     </div>
 
-    <!-- Word List Screen -->
-    <div id="wordlist-screen" class="hidden">
-      <div class="flex items-center gap-3 mb-4">
-        <button onclick="goHome()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center btn-press dark:bg-gray-800">←</button>
-        <h2 class="text-lg font-bold text-gray-800 dark:text-white">全部单词</h2>
+    <div class="px-4 mt-3 flex justify-between">
+      <button onclick="prevCard()" class="text-sm text-gray-400 btn-press flex items-center gap-1">
+        <span>←</span> 上一个
+      </button>
+      <button onclick="skipCard()" class="text-sm text-gray-400 btn-press flex items-center gap-1">
+        跳过 <span>→</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ========== COMPLETE SCREEN ========== -->
+  <div id="complete-screen" class="hidden text-center pt-10">
+    <div class="text-6xl mb-4">🎉</div>
+    <h2 class="text-2xl font-black text-gray-800 mb-2 dark:text-white">太棒了！</h2>
+    <p class="text-gray-500 mb-6">今日学习任务已完成</p>
+
+    <div class="bg-white rounded-2xl p-6 shadow-sm mx-4 mb-6 dark:bg-gray-800">
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="text-center">
+          <div class="text-3xl font-bold text-green-600" id="complete-new">0</div>
+          <div class="text-xs text-gray-400">新词掌握</div>
+        </div>
+        <div class="text-center">
+          <div class="text-3xl font-bold text-orange-600" id="complete-review">0</div>
+          <div class="text-xs text-gray-400">复习巩固</div>
+        </div>
       </div>
+      <div class="text-center pt-4 border-t border-gray-100 dark:border-gray-700">
+        <div class="text-4xl font-black text-indigo-600 mb-1" id="complete-total">0</div>
+        <div class="text-xs text-gray-400">累计已掌握单词</div>
+      </div>
+    </div>
+
+    <div id="stars-container" class="flex justify-center gap-2 mb-8"></div>
+
+    <button onclick="goHome()" class="w-3/4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 rounded-2xl shadow-lg btn-press">
+      返回首页 🏠
+    </button>
+  </div>
+
+  <!-- ========== WORD LIST SCREEN ========== -->
+  <div id="wordlist-screen" class="hidden">
+    <div class="flex items-center gap-3 mb-4 px-5 pt-6">
+      <button onclick="goHome()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center btn-press dark:bg-gray-800">←</button>
+      <h2 class="text-lg font-bold text-gray-800 dark:text-white">全部单词</h2>
+    </div>
+    <div class="px-4">
       <div class="bg-white rounded-2xl p-3 shadow-sm mb-3 flex gap-2 overflow-x-auto hide-scrollbar dark:bg-gray-800">
         <button onclick="filterSeason(0)" class="season-filter px-3 py-1.5 rounded-full text-xs font-bold bg-indigo-500 text-white whitespace-nowrap">全部</button>
         <button onclick="filterSeason(1)" class="season-filter px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600 whitespace-nowrap">第一季</button>
@@ -263,72 +325,74 @@
       </div>
       <div id="wordlist-grid" class="grid grid-cols-2 gap-3 pb-6"></div>
     </div>
+  </div>
 
-    <!-- Achievements Screen -->
-    <div id="achievements-screen" class="hidden">
-      <div class="flex items-center gap-3 mb-4">
-        <button onclick="goHome()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center btn-press dark:bg-gray-800">←</button>
-        <h2 class="text-lg font-bold text-gray-800 dark:text-white">我的成就</h2>
-      </div>
+  <!-- ========== ACHIEVEMENTS SCREEN ========== -->
+  <div id="achievements-screen" class="hidden">
+    <div class="flex items-center gap-3 mb-4 px-5 pt-6">
+      <button onclick="goHome()" class="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center btn-press dark:bg-gray-800">←</button>
+      <h2 class="text-lg font-bold text-gray-800 dark:text-white">我的成就</h2>
+    </div>
+    <div class="px-4">
       <div id="achievements-grid" class="grid grid-cols-2 gap-3 pb-6"></div>
     </div>
+  </div>
 
-  </main>
+</div>
 
-  <!-- Settings Modal -->
-  <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end">
-    <div class="bg-white rounded-t-3xl w-full max-w-md mx-auto p-6 animate-slide-up dark:bg-gray-800">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="text-lg font-bold text-gray-800 dark:text-white">设置</h3>
-        <button onclick="closeSettings()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center dark:bg-gray-700">✕</button>
+<!-- Settings Modal -->
+<div id="settings-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end">
+  <div class="bg-white rounded-t-3xl w-full max-w-md mx-auto p-6 animate-slide-up dark:bg-gray-800">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-lg font-bold text-gray-800 dark:text-white">设置</h3>
+      <button onclick="closeSettings()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center dark:bg-gray-700">✕</button>
+    </div>
+    <div class="space-y-4">
+      <div class="flex justify-between items-center">
+        <span class="text-sm text-gray-700 dark:text-gray-300">发音速度</span>
+        <select id="speech-rate" class="bg-gray-100 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white" onchange="saveSettings()">
+          <option value="0.7">慢速</option>
+          <option value="1" selected>正常</option>
+          <option value="1.3">快速</option>
+        </select>
       </div>
-      <div class="space-y-4">
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-700 dark:text-gray-300">发音速度</span>
-          <select id="speech-rate" class="bg-gray-100 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white" onchange="saveSettings()">
-            <option value="0.7">慢速</option>
-            <option value="1" selected>正常</option>
-            <option value="1.3">快速</option>
-          </select>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-700 dark:text-gray-300">每日新词数量</span>
-          <select id="daily-new" class="bg-gray-100 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white" onchange="saveSettings()">
-            <option value="3">3个</option>
-            <option value="5" selected>5个</option>
-            <option value="8">8个</option>
-            <option value="10">10个</option>
-          </select>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-700 dark:text-gray-300">每日复习数量</span>
-          <select id="daily-review" class="bg-gray-100 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white" onchange="saveSettings()">
-            <option value="3">3个</option>
-            <option value="5" selected>5个</option>
-            <option value="8">8个</option>
-            <option value="10">10个</option>
-          </select>
-        </div>
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-gray-700 dark:text-gray-300">深色模式</span>
-          <button onclick="toggleDarkMode()" class="text-sm text-indigo-600 font-bold" id="dark-mode-btn">跟随系统</button>
-        </div>
-        <div class="pt-4 border-t border-gray-100 dark:border-gray-700">
-          <p class="text-xs text-gray-400 mb-2">数据管理</p>
-          <div class="grid grid-cols-2 gap-2">
-            <button onclick="exportData(); closeSettings();" class="py-2 rounded-xl border-2 border-indigo-200 text-indigo-600 font-bold text-xs btn-press">💾 备份</button>
-            <button onclick="importData(); closeSettings();" class="py-2 rounded-xl border-2 border-indigo-200 text-indigo-600 font-bold text-xs btn-press">📂 恢复</button>
-          </div>
-        </div>
-        <button onclick="resetProgress()" class="w-full mt-4 py-3 rounded-xl border-2 border-red-200 text-red-500 font-bold text-sm btn-press">
-          ⚠️ 重置学习进度
-        </button>
+      <div class="flex justify-between items-center">
+        <span class="text-sm text-gray-700 dark:text-gray-300">每日新词数量</span>
+        <select id="daily-new" class="bg-gray-100 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white" onchange="saveSettings()">
+          <option value="3">3个</option>
+          <option value="5" selected>5个</option>
+          <option value="8">8个</option>
+          <option value="10">10个</option>
+        </select>
       </div>
+      <div class="flex justify-between items-center">
+        <span class="text-sm text-gray-700 dark:text-gray-300">每日复习数量</span>
+        <select id="daily-review" class="bg-gray-100 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white" onchange="saveSettings()">
+          <option value="3">3个</option>
+          <option value="5" selected>5个</option>
+          <option value="8">8个</option>
+          <option value="10">10个</option>
+        </select>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-sm text-gray-700 dark:text-gray-300">深色模式</span>
+        <button onclick="toggleDarkMode()" class="text-sm text-indigo-600 font-bold" id="dark-mode-btn">跟随系统</button>
+      </div>
+      <div class="pt-4 border-t border-gray-100 dark:border-gray-700">
+        <p class="text-xs text-gray-400 mb-2">数据管理</p>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="exportData(); closeSettings();" class="py-2 rounded-xl border-2 border-indigo-200 text-indigo-600 font-bold text-xs btn-press">💾 备份</button>
+          <button onclick="importData(); closeSettings();" class="py-2 rounded-xl border-2 border-indigo-200 text-indigo-600 font-bold text-xs btn-press">📂 恢复</button>
+        </div>
+      </div>
+      <button onclick="resetProgress()" class="w-full mt-4 py-3 rounded-xl border-2 border-red-200 text-red-500 font-bold text-sm btn-press">
+        ⚠️ 重置学习进度
+      </button>
     </div>
   </div>
 </div>
 
-<!-- Hidden file input for import -->
+<!-- Hidden file input -->
 <input type="file" id="import-file" accept=".json" class="hidden" onchange="handleImport(event)">
 
 <script src="js/data.js"></script>
